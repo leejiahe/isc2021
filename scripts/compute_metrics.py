@@ -3,14 +3,15 @@
 
 import argparse
 import matplotlib.pyplot as plt
-import numpy as np
+import io
+from PIL import Image
 
 from isc.metrics import evaluate, Metrics, PredictedMatch, print_metrics
 from isc.io import read_ground_truth, read_predictions, write_predictions, read_descriptors
 from isc.descriptor_matching import match_and_make_predictions, knn_match_and_make_predictions
 from typing import Optional
 
-import h5py
+import wandb
 
 import faiss
 
@@ -29,6 +30,14 @@ def plot_pr_curve(
     plt.grid()
     if pr_curve_filepath:
         plt.savefig(pr_curve_filepath)
+        
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close()
+    buf.seek(0)
+    pil_image = Image.open(buf)
+
+    return pil_image
 
 
 
@@ -51,9 +60,9 @@ def compute_metrics(args):
 
 
 def compute_metrics_track2(args):
+    wandb.init(project=args.project, name=args.name)
+    
     gt = read_ground_truth(args.gt_filepath)
-
-
 
     db_image_ids, xb = read_descriptors(args.db_descs)
     d = xb.shape[1]
@@ -102,9 +111,16 @@ def compute_metrics_track2(args):
     print(f"Evaluating {len(predictions)} predictions ({len(gt)} GT matches)")
 
     metrics = evaluate(gt, predictions)
+    wandb.log({
+        'uAP':metrics.average_precision,
+        'r@90':metrics.recall_at_p90,
+        'r@1':metrics.recall_at_rank1,
+        'r@10':metrics.recall_at_rank10,
+        })
     print_metrics(metrics)
     if args.pr_curve_filepath:
-        plot_pr_curve(metrics, args.title, args.pr_curve_filepath)
+        pr_curve = plot_pr_curve(metrics, args.title, args.pr_curve_filepath)
+        wandb.log({"pr_curve": wandb.Image(pr_curve)})
     return metrics
 
 
@@ -134,6 +150,10 @@ if __name__ == "__main__":
     group = parser.add_argument_group("output")
     aa("--pr_curve_filepath", default="", help="output file for P-R curve")
     aa("--title", default="", help="title of the plot")
+
+    group = parser.add_argument_group("wandb")
+    aa("--project", default="isc2021", help="wandb project name")
+    aa("--name", default="compute_metrics", help="wandb run name")
 
     args = parser.parse_args()
 
