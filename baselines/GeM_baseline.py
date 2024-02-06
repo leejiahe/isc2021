@@ -23,6 +23,8 @@ import faiss
 import tempfile
 import numpy as np
 import h5py
+from torchvision.transforms import TransposeTransform
+import platform
 
 
 def load_model(name, checkpoint_file):

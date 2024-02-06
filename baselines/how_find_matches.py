@@ -8,7 +8,7 @@ import pickle
 from pathlib import Path
 import numpy as np
 
-from how.utils import io_helpers
+from src.sota.how.how.utils import io_helpers
 
 HOW_ROOT = Path("baselines/how")
 MAX_RESULTS = 500_000
