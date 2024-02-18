@@ -1,6 +1,7 @@
 # Copyright (c) 2015-present, Facebook, Inc.
 # All rights reserved.
 
+import pickle
 import argparse
 import matplotlib.pyplot as plt
 import io
@@ -60,7 +61,12 @@ def compute_metrics(args):
 
 
 def compute_metrics_track2(args):
-    wandb.init(project=args.project, name=args.name)
+    wandb.init(
+        project=args.project,
+        group=args.group,
+        name=args.name,
+        tags=args.tags,
+        )
     
     gt = read_ground_truth(args.gt_filepath)
 
@@ -111,13 +117,16 @@ def compute_metrics_track2(args):
     print(f"Evaluating {len(predictions)} predictions ({len(gt)} GT matches)")
 
     metrics = evaluate(gt, predictions)
-    wandb.log({
-        'uAP':metrics.average_precision,
-        'r@90':metrics.recall_at_p90,
-        'r@1':metrics.recall_at_rank1,
-        'r@10':metrics.recall_at_rank10,
-        })
     print_metrics(metrics)
+
+    wandb.run.summary['uAP'] = metrics.average_precision
+    wandb.run.summary['r@P90'] = metrics.recall_at_p90
+    wandb.run.summary['r@1'] = metrics.recall_at_rank1
+    wandb.run.summary['r@10'] = metrics.recall_at_rank10
+    
+    with open(f'./{args.name}_metrics.pkl', 'wb') as f:
+        pickle.dump(metrics, f)
+    
     if args.pr_curve_filepath:
         pr_curve = plot_pr_curve(metrics, args.title, args.pr_curve_filepath)
         wandb.log({"pr_curve": wandb.Image(pr_curve)})
@@ -154,7 +163,8 @@ if __name__ == "__main__":
     group = parser.add_argument_group("wandb")
     aa("--project", default="isc2021", help="wandb project name")
     aa("--name", default="compute_metrics", help="wandb run name")
-
+    aa("--group", default="eval", help="wandb group name")
+    aa("--tags", nargs='+', default=[], help="wandb tags")
     args = parser.parse_args()
 
     if not args.track2:
